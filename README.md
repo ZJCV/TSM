@@ -5,10 +5,10 @@
   <!-- <a title="俄语" href="../ru/README.md">🇷🇺</a> -->
 </div>
 
- <div align="center"><a title="" href="https://github.com/ZJCV/TSN"><img align="center" src="./imgs/TSN.png"></a></div>
+ <div align="center"><a title="" href="https://github.com/ZJCV/TSM"><img align="center" src="./imgs/TSM.png"></a></div>
 
 <p align="center">
-  «TSN»复现了论文<a title="" href="https://arxiv.org/abs/1608.00859">Temporal Segment Networks</a>提出的视频分类模型
+  «TSM»复现了论文<a title="" href="https://arxiv.org/abs/1811.08383">Temporal Shift Module</a>提出的视频分类模型
 <br>
 <br>
   <a href="https://github.com/RichardLitt/standard-readme"><img src="https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square"></a>
@@ -33,12 +33,12 @@
 
 ## 致谢
 
-* [yjxiong/tsn-pytorch](https://github.com/yjxiong/tsn-pytorch)
+* [mit-han-lab/temporal-shift-module ](https://github.com/mit-han-lab/temporal-shift-module)
 * [open-mmlab/mmaction2](https://github.com/open-mmlab/mmaction2)
 
 ## 参与贡献方式
 
-欢迎任何人的参与！打开[issue](https://github.com/zjykzj/TSN/issues)或提交合并请求。
+欢迎任何人的参与！打开[issue](https://github.com/zjykzj/TSM/issues)或提交合并请求。
 
 注意:
 
