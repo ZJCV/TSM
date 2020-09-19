@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch.nn.modules.module import T
 from torchvision.models.utils import load_state_dict_from_url
 
+from tsn.model import registry
+
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
            'wide_resnet50_2', 'wide_resnet101_2']
@@ -124,7 +126,7 @@ class ResNet(nn.Module):
 
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None, partial_bn=False):
+                 norm_layer=None, partial_bn=False, map_location=None):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -211,9 +213,9 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
+        # x = self.avgpool(x)
+        # x = torch.flatten(x, 1)
+        # x = self.fc(x)
 
         return x
 
@@ -227,12 +229,16 @@ class ResNet(nn.Module):
                 count += 1
                 if count == 1:
                     continue
-                m.requires_grad_(False)
+
+                m.eval()
+                # shutdown update in frozen mode
+                m.weight.requires_grad = False
+                m.bias.requires_grad = False
 
     def train(self: T, mode: bool = True) -> T:
         super(ResNet, self).train(mode=mode)
 
-        if self.partial_bn:
+        if mode and self.partial_bn:
             self.freezing_bn()
 
         return self
@@ -242,11 +248,13 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
     model = ResNet(block, layers, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
-                                              progress=progress)
+                                              progress=progress,
+                                              map_location=kwargs.get('map_location', None))
         model.load_state_dict(state_dict)
     return model
 
 
+@registry.BACKBONE.register('resnet18')
 def resnet18(pretrained=False, progress=True, **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -259,6 +267,7 @@ def resnet18(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
+@registry.BACKBONE.register('resnet34')
 def resnet34(pretrained=False, progress=True, **kwargs):
     r"""ResNet-34 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -271,6 +280,7 @@ def resnet34(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
+@registry.BACKBONE.register('resnet50')
 def resnet50(pretrained=False, progress=True, **kwargs):
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -283,6 +293,7 @@ def resnet50(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
+@registry.BACKBONE.register('resnet101')
 def resnet101(pretrained=False, progress=True, **kwargs):
     r"""ResNet-101 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -295,6 +306,7 @@ def resnet101(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
+@registry.BACKBONE.register('resnet152')
 def resnet152(pretrained=False, progress=True, **kwargs):
     r"""ResNet-152 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_

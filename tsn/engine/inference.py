@@ -62,7 +62,7 @@ def inference(cfg, model, device, **kwargs):
     data_loader = build_dataloader(cfg, train=False)
     dataset = data_loader.dataset
 
-    logger = logging.getLogger(logger_name)
+    logger = setup_logger(logger_name)
     logger.info("Evaluating {} dataset({} video clips):".format(dataset_name, len(dataset)))
 
     results_dict, cate_acc_dict, acc_top1, acc_top5 = compute_on_dataset(model, data_loader, device)

@@ -8,17 +8,13 @@
 """
 
 import torch.nn as nn
+
 from .resnet import resnet50
+from tsn.model import registry
 
 
-def build_backbone(name, num_classes=1000, pretrained=True, partial_bn=False):
-    if 'resnet50'.__eq__(name):
-        model = resnet50(pretrained=pretrained, partial_bn=partial_bn)
-
-        fc = model.fc
-        in_features = fc.in_features
-        model.fc = nn.Linear(in_features=in_features, out_features=num_classes, bias=True)
-
-        return model
-    else:
-        raise ValueError('no matching backbone exists')
+def build_backbone(cfg, map_location=None):
+    return registry.BACKBONE[cfg.MODEL.BACKBONE.NAME] \
+        (pretrained=cfg.MODEL.BACKBONE.TORCHVISION_PRETRAINED,
+         partial_bn=cfg.MODEL.BACKBONE.PARTIAL_BN,
+         map_location=map_location)

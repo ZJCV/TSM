@@ -1,0 +1,52 @@
+DATASETS:
+  MODALITY: 'RGBDiff'
+  NUM_SEGS: 8
+  TRAIN:
+    NAME: 'HMDB51'
+    DATA_DIR: 'data/hmdb51/rawframes'
+    ANNOTATION_DIR: 'data/hmdb51'
+    SPLIT: 1
+  TEST:
+    NAME: 'HMDB51'
+    DATA_DIR: 'data/hmdb51/rawframes'
+    ANNOTATION_DIR: 'data/hmdb51'
+    SPLIT: 1
+TRANSFORM:
+  INPUT_SIZE: (224, 224, 3)
+  MEAN: (0.485, 0.456, 0.406)
+  STD: (0.229, 0.224, 0.225)
+DATALOADER:
+  TRAIN_BATCH_SIZE: 16
+  TEST_BATCH_SIZE: 16
+  NUM_WORKERS: 8
+MODEL:
+  PRETRAINED: ""
+  BACKBONE:
+    NAME: 'resnet50'
+    PARTIAL_BN: False
+    TORCHVISION_PRETRAINED: True
+  HEAD:
+    NAME: 'TSNHead'
+    FEATURE_DIMS: 2048
+    NUM_CLASSES: 51
+  RECOGNIZER:
+    NAME: 'TSNRecognizer'
+  CONSENSU:
+    NAME: 'AvgConsensus'
+  CRITERION:
+    NAME: 'crossentropy'
+OPTIMIZER:
+  NAME: 'sgd'
+  LR: 2e-3
+  WEIGHT_DECAY: 3e-5
+  MOMENTUM: 0.9
+LR_SCHEDULER:
+  NAME: 'cosine_annearling_lr'
+  MINIMAL_LR: 3e-5
+  WARMUP: True
+  ITERATION: 1000
+  MULTIPLIER: 1.0
+TRAIN:
+  MAX_ITER: 20000
+OUTPUT:
+  DIR: 'outputs/trn_resnet50_hmdb51_rgb'

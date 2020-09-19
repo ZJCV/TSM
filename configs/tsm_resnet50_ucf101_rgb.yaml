@@ -1,0 +1,52 @@
+DATASETS:
+  MODALITY: 'RGB'
+  NUM_SEGS: 3
+  TRAIN:
+    NAME: 'UCF101'
+    DATA_DIR: 'data/ucf101/rawframes'
+    ANNOTATION_DIR: 'data/ucf101'
+    SPLIT: 1
+  TEST:
+    NAME: 'UCF101'
+    DATA_DIR: 'data/ucf101/rawframes'
+    ANNOTATION_DIR: 'data/ucf101'
+    SPLIT: 1
+TRANSFORM:
+  INPUT_SIZE: (224, 224, 3)
+  MEAN: (0.485, 0.456, 0.406)
+  STD: (0.229, 0.224, 0.225)
+DATALOADER:
+  TRAIN_BATCH_SIZE: 32
+  TEST_BATCH_SIZE: 32
+  NUM_WORKERS: 8
+MODEL:
+  PRETRAINED: ""
+  BACKBONE:
+    NAME: 'resnet50'
+    PARTIAL_BN: False
+    TORCHVISION_PRETRAINED: True
+  HEAD:
+    NAME: 'TSNHead'
+    FEATURE_DIMS: 2048
+    NUM_CLASSES: 101
+  RECOGNIZER:
+    NAME: 'TSNRecognizer'
+  CONSENSU:
+    NAME: 'AvgConsensus'
+  CRITERION:
+    NAME: 'crossentropy'
+OPTIMIZER:
+  NAME: 'sgd'
+  LR: 1e-2
+  WEIGHT_DECAY: 3e-4
+  MOMENTUM: 0.9
+LR_SCHEDULER:
+  NAME: 'cosine_annearling_lr'
+  MINIMAL_LR: 3e-4
+  WARMUP: True
+  ITERATION: 400
+  MULTIPLIER: 1.0
+TRAIN:
+  MAX_ITER: 20000
+OUTPUT:
+  DIR: 'outputs/trn_resnet50_ucf101_rgb'

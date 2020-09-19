@@ -1,3 +1,9 @@
 from tsn.util.registry import Registry
 
-CRITERIONS = Registry()
+BACKBONE = Registry()
+HEAD = Registry()
+RECOGNIZER = Registry()
+
+CONSENSU = Registry()
+
+CRITERION = Registry()

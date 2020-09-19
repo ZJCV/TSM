@@ -48,27 +48,31 @@ class CheckPointer:
 
         self.tag_last_checkpoint(save_file)
 
-    def load(self, f=None, use_latest=True):
-        if self.has_checkpoint() and use_latest:
+    def load(self, f=None, use_latest=True, map_location=None, rank=0):
+        if not f and self.has_checkpoint() and use_latest:
             # override argument with existing checkpoint
             f = self.get_checkpoint_file()
         if not f:
             # no checkpoint could be found
-            self.logger.info("No checkpoint found.")
+            if rank == 0:
+                self.logger.info("No checkpoint found.")
             return {}
 
-        self.logger.info("Loading checkpoint from {}".format(f))
-        checkpoint = self._load_file(f)
+        if rank == 0:
+            self.logger.info("Loading checkpoint from {}".format(f))
+        checkpoint = self._load_file(f, map_location=map_location)
         model = self.model
         if isinstance(model, DistributedDataParallel):
             model = self.model.module
 
         model.load_state_dict(checkpoint.pop("model"))
         if "optimizer" in checkpoint and self.optimizer:
-            self.logger.info("Loading optimizer from {}".format(f))
+            if rank == 0:
+                self.logger.info("Loading optimizer from {}".format(f))
             self.optimizer.load_state_dict(checkpoint.pop("optimizer"))
         if "scheduler" in checkpoint and self.scheduler:
-            self.logger.info("Loading scheduler from {}".format(f))
+            if rank == 0:
+                self.logger.info("Loading scheduler from {}".format(f))
             self.scheduler.load_state_dict(checkpoint.pop("scheduler"))
 
         # return any further checkpoint data
@@ -95,5 +99,8 @@ class CheckPointer:
         with open(save_file, "w") as f:
             f.write(last_filename)
 
-    def _load_file(self, f):
-        return torch.load(f, map_location=torch.device("cpu"))
+    def _load_file(self, f, map_location=None):
+        if map_location:
+            return torch.load(f, map_location=map_location)
+        else:
+            return torch.load(f, map_location=torch.device("cpu"))

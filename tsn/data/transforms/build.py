@@ -11,7 +11,7 @@ import torchvision.transforms as transforms
 
 
 def build_transform(cfg, train=True):
-    size = cfg.MODEL.INPUT_SIZE
+    size = cfg.TRANSFORM.INPUT_SIZE
     h, w, c = size
     MEAN = cfg.TRANSFORM.MEAN
     STD = cfg.TRANSFORM.STD
@@ -19,9 +19,11 @@ def build_transform(cfg, train=True):
     if train:
         transform = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.Resize((h, w)),
+            transforms.Resize(h),
+            transforms.RandomCrop((h, w)),
             transforms.RandomHorizontalFlip(),
             transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
+            transforms.RandomRotation(10),
             transforms.ToTensor(),
             transforms.Normalize(MEAN, STD),
             transforms.RandomErasing()

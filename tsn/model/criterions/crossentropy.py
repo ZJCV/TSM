@@ -11,6 +11,6 @@ import torch.nn as nn
 from tsn.model import registry
 
 
-@registry.CRITERIONS.register('crossentropy')
+@registry.CRITERION.register('crossentropy')
 def build_crossentropy(cfg):
     return nn.CrossEntropyLoss()
