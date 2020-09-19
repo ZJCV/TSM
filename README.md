@@ -20,12 +20,65 @@
 
 - [内容列表](#内容列表)
 - [背景](#背景)
+- [安装](#安装)
+- [使用](#使用)
 - [主要维护人员](#主要维护人员)
 - [致谢](#致谢)
 - [参与贡献方式](#参与贡献方式)
 - [许可证](#许可证)
 
 ## 背景
+
+[TSM: Temporal Shift Module for Efficient Video Understanding](https://arxiv.org/abs/1811.08383)在`TSN`模型的基础上嵌入时间抖动模块，进一步提高了视频分类精度。其`CodeBase`来自于[TSN](https://github.com/ZJCV/TSN)
+
+## 安装
+
+通过`requirements.txt`安装运行所需依赖
+
+```
+$ pip install -r requirements.txt
+```
+
+处理数据时需要额外安装[denseflow](https://github.com/open-mmlab/denseflow)，可以在[innerlee/setup](https://github.com/innerlee/setup)中找到安装脚本
+
+## 使用
+
+首先设置`GPU`和当前位置
+
+```
+$ export CUDA_VISIBLE_DEVICES=1
+$ export PYTHONPATH=.
+```
+
+* 训练
+
+```
+# 训练UCF101
+# 单GPU
+$ python tools/train.py --config_file=configs/tsm_resnet50_ucf101_rgb.yaml
+# 多GPU
+$ python tools/train.py \
+--config_file=configs/tsm_resnet50_ucf101_rgb.yaml \
+--eval_step=1000 \
+--save_step=1000 \
+-g=2
+```
+
+* 测试
+
+```
+# 单模态测试
+$ python tools/test.py <config_file> <pth_file>
+$ python tools/test.py configs/tsm_resnet50_ucf101_rgbdiff.yaml outputs/tsm_resnet50_ucf101_rgbdiff.pth
+# 多模态融合测试 - RGB + RGBDiff
+$ python tools/fusion.py <rgb_config_file> <rgb_pth_file> <rgbdiff_config_file> <rgbdiff_pth_file>
+$ python tools/fusion.py \
+configs/tsm_resnet50_ucf101_rgb.yaml \
+outputs/tsm_resnet50_ucf101_rgb.pth  \
+configs/tsm_resnet50_ucf101_rgbdiff.yaml \
+outputs/tsm_resnet50_ucf101_rgbdiff.pth
+```
+
 
 ## 主要维护人员
 
