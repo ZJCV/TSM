@@ -22,19 +22,23 @@ from .transforms.build import build_transform
 
 def build_dataloader(cfg, train=True,
                      start_iter=0,
-                     gpus=1, world_size=1, rank=0):
+                     world_size=1, rank=0):
     transform = build_transform(cfg, train=train)
     dataset = build_dataset(cfg, transform=transform, is_train=train)
 
     if train:
-        batch_size = cfg.DATALOADER.TRAIN_BATCH_SIZE
-        if gpus == 1:
+        if world_size != 1 and rank == 0:
+            batch_size = int(cfg.DATALOADER.TRAIN_BATCH_SIZE * 3 / 4)
+            sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
+        else:
+            batch_size = cfg.DATALOADER.TRAIN_BATCH_SIZE
             # 训练阶段使用随机采样器
             sampler = torch.utils.data.RandomSampler(dataset)
-        else:
-            sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
     else:
-        batch_size = cfg.DATALOADER.TEST_BATCH_SIZE
+        if world_size != 1 and rank == 0:
+            batch_size = int(cfg.DATALOADER.TEST_BATCH_SIZE * 3 / 4)
+        else:
+            batch_size = cfg.DATALOADER.TEST_BATCH_SIZE
         sampler = torch.utils.data.sampler.SequentialSampler(dataset)
 
     batch_sampler = torch.utils.data.sampler.BatchSampler(sampler=sampler, batch_size=batch_size, drop_last=False)

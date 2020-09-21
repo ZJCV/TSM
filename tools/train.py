@@ -70,7 +70,7 @@ def train(gpu, args, cfg):
                 lr_scheduler.after_scheduler.optimizer = optimizer
 
     data_loader = build_dataloader(cfg, train=True, start_iter=arguments['iteration'],
-                                   gpus=args.gpus, world_size=args.world_size, rank=rank)
+                                   world_size=args.world_size, rank=rank)
 
     model = do_train(args, cfg, arguments,
                      data_loader, model, criterion, optimizer, lr_scheduler,
