@@ -21,12 +21,15 @@ class TSNHead(nn.Module):
 
         in_channels = cfg.MODEL.HEAD.FEATURE_DIMS
         num_classes = cfg.MODEL.HEAD.NUM_CLASSES
+        dropout_rate = cfg.MODEL.HEAD.DROPOUT
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(in_channels, num_classes)
+        self.dropout = nn.Dropout(p=dropout_rate)
 
     def forward(self, x):
         x = self.avgpool(x)
+        x = self.dropout(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
 

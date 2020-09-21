@@ -28,9 +28,10 @@ MODEL:
   HEAD:
     NAME: 'TSNHead'
     FEATURE_DIMS: 2048
+    DROPOUT: 0
     NUM_CLASSES: 51
   RECOGNIZER:
-    NAME: 'TSNRecognizer'
+    NAME: 'TSMRecognizer'
   CONSENSU:
     NAME: 'AvgConsensus'
   CRITERION:

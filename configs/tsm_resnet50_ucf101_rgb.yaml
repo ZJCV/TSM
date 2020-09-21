@@ -1,6 +1,6 @@
 DATASETS:
   MODALITY: 'RGB'
-  NUM_SEGS: 3
+  NUM_SEGS: 8
   TRAIN:
     NAME: 'UCF101'
     DATA_DIR: 'data/ucf101/rawframes'
@@ -16,8 +16,8 @@ TRANSFORM:
   MEAN: (0.485, 0.456, 0.406)
   STD: (0.229, 0.224, 0.225)
 DATALOADER:
-  TRAIN_BATCH_SIZE: 16
-  TEST_BATCH_SIZE: 16
+  TRAIN_BATCH_SIZE: 10
+  TEST_BATCH_SIZE: 10
   NUM_WORKERS: 8
 MODEL:
   PRETRAINED: ""
@@ -28,9 +28,10 @@ MODEL:
   HEAD:
     NAME: 'TSNHead'
     FEATURE_DIMS: 2048
+    DROPOUT: 0
     NUM_CLASSES: 101
   RECOGNIZER:
-    NAME: 'TSNRecognizer'
+    NAME: 'TSMRecognizer'
   CONSENSU:
     NAME: 'AvgConsensus'
   CRITERION:
@@ -44,9 +45,9 @@ LR_SCHEDULER:
   NAME: 'cosine_annearling_lr'
   MINIMAL_LR: 3e-4
   WARMUP: True
-  ITERATION: 400
+  ITERATION: 1000
   MULTIPLIER: 1.0
 TRAIN:
-  MAX_ITER: 20000
+  MAX_ITER: 50000
 OUTPUT:
   DIR: 'outputs/trn_resnet50_ucf101_rgb'

@@ -1,6 +1,6 @@
 DATASETS:
   MODALITY: 'RGBDiff'
-  NUM_SEGS: 3
+  NUM_SEGS: 8
   TRAIN:
     NAME: 'JESTER'
     DATA_DIR: 'data/jester/20bn-jester-v1'
@@ -26,9 +26,10 @@ MODEL:
   HEAD:
     NAME: 'TSNHead'
     FEATURE_DIMS: 2048
+    DROPOUT: 0
     NUM_CLASSES: 27
   RECOGNIZER:
-    NAME: 'TSNRecognizer'
+    NAME: 'TSMRecognizer'
   CONSENSU:
     NAME: 'AvgConsensus'
   CRITERION:
