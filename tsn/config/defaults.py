@@ -28,7 +28,8 @@ _C.DATASETS.TEST.SPLIT = 1
 # ---------------------------------------------------------------------------- #
 _C.TRANSFORM = CN()
 # HxWxC
-_C.TRANSFORM.INPUT_SIZE = (112, 112, 3)
+_C.TRANSFORM.INPUT_SIZE = (224, 224, 3)
+_C.TRANSFORM.SMALLER_EDGE = 256
 _C.TRANSFORM.MEAN = (0.485, 0.456, 0.406)  # (0.5, 0.5, 0.5)
 _C.TRANSFORM.STD = (0.229, 0.224, 0.225)  # (0.5, 0.5, 0.5)
 
