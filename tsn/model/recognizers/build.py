@@ -12,6 +12,7 @@ import torch.nn as nn
 from tsn.model import registry
 
 from .tsn_recognizer import TSNRecognizer
+from .tsm_recognizer import TSMRecognizer
 
 
 def build_recognizer(cfg, map_location=None):
