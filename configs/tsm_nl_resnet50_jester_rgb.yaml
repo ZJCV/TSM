@@ -1,0 +1,52 @@
+DATASETS:
+  MODALITY: 'RGB'
+  NUM_SEGS: 8
+  TRAIN:
+    NAME: 'JESTER'
+    DATA_DIR: 'data/jester/20bn-jester-v1'
+    ANNOTATION_DIR: 'data/jester'
+  TEST:
+    NAME: 'JESTER'
+    DATA_DIR: 'data/jester/20bn-jester-v1'
+    ANNOTATION_DIR: 'data/jester'
+TRANSFORM:
+  INPUT_SIZE: (224, 224, 3)
+  SMALLER_EDGE: 256
+  MEAN: (0.485, 0.456, 0.406)
+  STD: (0.229, 0.224, 0.225)
+DATALOADER:
+  TRAIN_BATCH_SIZE: 16
+  TEST_BATCH_SIZE: 16
+  NUM_WORKERS: 8
+MODEL:
+  PRETRAINED: ""
+  BACKBONE:
+    NAME: 'resnet50'
+    PARTIAL_BN: False
+    TORCHVISION_PRETRAINED: True
+  HEAD:
+    NAME: 'TSNHead'
+    FEATURE_DIMS: 2048
+    DROPOUT: 0
+    NUM_CLASSES: 27
+  RECOGNIZER:
+    NAME: 'TSM_NL_Recognizer'
+  CONSENSU:
+    NAME: 'AvgConsensus'
+  CRITERION:
+    NAME: 'crossentropy'
+OPTIMIZER:
+  NAME: 'sgd'
+  LR: 1e-2
+  WEIGHT_DECAY: 3e-4
+  MOMENTUM: 0.9
+LR_SCHEDULER:
+  NAME: 'cosine_annearling_lr'
+  MINIMAL_LR: 3e-4
+  WARMUP: True
+  ITERATION: 1000
+  MULTIPLIER: 1.0
+TRAIN:
+  MAX_ITER: 50000
+OUTPUT:
+  DIR: 'outputs/trn_resnet50_jester_rgb'
