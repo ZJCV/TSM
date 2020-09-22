@@ -33,7 +33,8 @@ def build_transform(cfg, train=True):
     else:
         transform = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.Resize((h, w)),
+            transforms.Resize(h),
+            transforms.CenterCrop((h, w)),
             transforms.ToTensor(),
             transforms.Normalize(MEAN, STD)
         ])
