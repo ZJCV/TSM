@@ -51,4 +51,4 @@ LR_SCHEDULER:
 TRAIN:
   MAX_ITER: 20000
 OUTPUT:
-  DIR: 'outputs/trn_resnet50_hmdb51_rgb'
+  DIR: 'outputs/tsm_resnet50_hmdb51_rgb'
