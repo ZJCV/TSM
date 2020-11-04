@@ -10,15 +10,16 @@
 import torch.nn as nn
 import torch.optim as optim
 
-from tsn.optim import registry
+from .. import registry
 
 
-@registry.OPTIMIZERS.register('sgd')
+@registry.OPTIMIZERS.register('SGD')
 def build_sgd(cfg, model):
     assert isinstance(model, nn.Module)
 
     lr = cfg.OPTIMIZER.LR
-    momentum = cfg.OPTIMIZER.MOMENTUM
     weight_decay = cfg.OPTIMIZER.WEIGHT_DECAY
+
+    momentum = cfg.OPTIMIZER.SGD.MOMENTUM
 
     return optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)

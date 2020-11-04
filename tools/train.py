@@ -7,122 +7,74 @@
 @description: 
 """
 
-import os
 import numpy as np
 import torch
-import argparse
 
-import torch.multiprocessing as mp
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-
-from tsn.config import cfg
 from tsn.data.build import build_dataloader
-from tsn.model.build import build_model, build_criterion
-from tsn.optim.build import build_optimizer, build_lr_scheduler
 from tsn.engine.trainer import do_train
-from tsn.engine.inference import do_evaluation
+from tsn.model.recognizers.build import build_recognizer
+from tsn.model.criterions.build import build_criterion
+from tsn.optim.optimizers.build import build_optimizer
+from tsn.optim.lr_schedulers.build import build_lr_scheduler
+from tsn.util import logging
 from tsn.util.checkpoint import CheckPointer
-from tsn.util.logger import setup_logger
 from tsn.util.collect_env import collect_env_info
-from tsn.util.dist_util import setup, cleanup
+from tsn.util.distributed import init_distributed_training, get_device, get_local_rank, synchronize
+from tsn.util.misc import launch_job
+from tsn.util.parser import parse_train_args, load_train_config
 
 
-def train(gpu, args, cfg):
-    rank = args.nr * args.gpus + gpu
-    setup(rank, args.world_size, args.gpus)
+def train(cfg):
+    # Set up environment.
+    init_distributed_training(cfg)
+    # Set random seed from configs.
+    np.random.seed(cfg.RNG_SEED)
+    torch.manual_seed(cfg.RNG_SEED)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-    logger = setup_logger(cfg.TRAIN.NAME)
+    logger = logging.setup_logging(__name__)
+    logger.info('init start')
     arguments = {"iteration": 0}
-    arguments['rank'] = rank
 
-    device = torch.device(f'cuda:{gpu}' if torch.cuda.is_available() else 'cpu')
-    map_location = {'cuda:%d' % 0: 'cuda:%d' % rank}
-    model = build_model(cfg, map_location=map_location).to(device)
-    if cfg.MODEL.PRETRAINED != "":
-        if rank == 0 and logger:
-            logger.info(f'load pretrained: {cfg.MODEL.PRETRAINED}')
-        checkpointer = CheckPointer(model, logger=logger)
-        checkpointer.load(cfg.MODEL.PRETRAINED, map_location=map_location, rank=rank)
-
-    if args.gpus > 1:
-        model = DDP(model, device_ids=[gpu], find_unused_parameters=True)
-    criterion = build_criterion(cfg)
+    device = get_device(get_local_rank())
+    model = build_recognizer(cfg, device)
+    criterion = build_criterion(cfg, device)
     optimizer = build_optimizer(cfg, model)
     lr_scheduler = build_lr_scheduler(cfg, optimizer)
 
-    checkpointer = CheckPointer(model, optimizer=optimizer, scheduler=lr_scheduler, save_dir=cfg.OUTPUT.DIR,
+    checkpointer = CheckPointer(model, optimizer=optimizer, scheduler=lr_scheduler, save_dir=cfg.OUTPUT_DIR,
                                 save_to_disk=True, logger=logger)
-    if args.resume:
-        if rank == 0:
-            logger.info('resume ...')
-        extra_checkpoint_data = checkpointer.load(map_location=map_location, rank=rank)
-        if extra_checkpoint_data != dict():
+    if cfg.TRAIN.RESUME:
+        logger.info('resume start')
+        extra_checkpoint_data = checkpointer.load(map_location=device)
+        if isinstance(extra_checkpoint_data, dict):
             arguments['iteration'] = extra_checkpoint_data['iteration']
-            if cfg.LR_SCHEDULER.WARMUP:
-                if rank == 0:
-                    logger.info('warmup ...')
+            if cfg.LR_SCHEDULER.IS_WARMUP:
+                logger.info('warmup start')
                 if lr_scheduler.finished:
                     optimizer.load_state_dict(lr_scheduler.after_scheduler.optimizer.state_dict())
                 else:
                     optimizer.load_state_dict(lr_scheduler.optimizer.state_dict())
                 lr_scheduler.optimizer = optimizer
                 lr_scheduler.after_scheduler.optimizer = optimizer
+                logger.info('warmup end')
+        logger.info('resume end')
 
-    data_loader = build_dataloader(cfg, train=True, start_iter=arguments['iteration'],
-                                   world_size=args.world_size, rank=rank)
+    data_loader = build_dataloader(cfg, is_train=True, start_iter=arguments['iteration'])
 
-    model = do_train(args, cfg, arguments,
-                     data_loader, model, criterion, optimizer, lr_scheduler,
-                     checkpointer, device, logger)
-
-    if rank == 0 and not args.stop_eval:
-        logger.info('Start final evaluating...')
-        torch.cuda.empty_cache()  # speed up evaluating after training finished
-        do_evaluation(cfg, model, device)
-
-    cleanup()
+    logger.info('init end')
+    synchronize()
+    do_train(cfg, arguments,
+             data_loader, model, criterion, optimizer, lr_scheduler,
+             checkpointer, device)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='TSN Training With PyTorch')
-    parser.add_argument("--config_file", default="", metavar="FILE",
-                        help="path to config file", type=str)
-    parser.add_argument('--log_step', default=10, type=int,
-                        help='Print logs every log_step')
-    parser.add_argument('--save_step', default=2500, type=int,
-                        help='Save checkpoint every save_step')
-    parser.add_argument('--stop_save', default=False, action='store_true')
-    parser.add_argument('--eval_step', default=2500, type=int,
-                        help='Evaluate dataset every eval_step, disabled when eval_step < 0')
-    parser.add_argument('--stop_eval', default=False, action='store_true')
-    parser.add_argument('--resume', default=False, action='store_true',
-                        help='Resume training')
-    parser.add_argument('--use_tensorboard', default=1, type=int)
+    args = parse_train_args()
+    cfg = load_train_config(args)
 
-    parser.add_argument('-n', '--nodes', default=1, type=int, metavar='N',
-                        help='number of machines (default: 1)')
-    parser.add_argument('-g', '--gpus', default=1, type=int,
-                        help='number of gpus per node')
-    parser.add_argument('-nr', '--nr', default=0, type=int,
-                        help='ranking within the nodes')
-
-    parser.add_argument(
-        "opts",
-        help="Modify config options using the command-line",
-        default=None,
-        nargs=argparse.REMAINDER,
-    )
-
-    args = parser.parse_args()
-    if args.config_file:
-        cfg.merge_from_file(args.config_file)
-    cfg.merge_from_list(args.opts)
-    cfg.freeze()
-
-    if not os.path.exists(cfg.OUTPUT.DIR):
-        os.makedirs(cfg.OUTPUT.DIR)
-    logger = setup_logger("TSN", save_dir=cfg.OUTPUT.DIR)
+    logger = logging.setup_logging(__name__, output_dir=cfg.OUTPUT_DIR)
     logger.info(args)
 
     logger.info("Environment info:\n" + collect_env_info())
@@ -133,10 +85,7 @@ def main():
             logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
-    args.world_size = args.gpus * args.nodes
-    os.environ['MASTER_ADDR'] = '127.0.0.1'
-    os.environ['MASTER_PORT'] = '17928'
-    mp.spawn(train, nprocs=args.gpus, args=(args, cfg))
+    launch_job(cfg=cfg, init_method=args.init_method, func=train)
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 
 """
 @date: 2020/9/18 上午9:53
-@file: fusion.py
+@file: fusion_test.py
 @author: zj
 @description: 
 """
@@ -19,7 +19,7 @@ from tsn.data.build import build_dataloader
 from tsn.model.build import build_model
 from tsn.util.metrics import topk_accuracy
 from tsn.util.checkpoint import CheckPointer
-from tsn.util.logger import setup_logger
+from tsn.util import logging
 from tsn.util.collect_env import collect_env_info
 
 
@@ -37,11 +37,11 @@ def compute_on_dataset(rgb_model, rgb_data_loader, rgbdiff_model, rgbdiff_data_l
         outputs_list = list()
 
         images, targets = next(rgb_data_loader_iter)
-        outputs = rgb_model(images.to(device)).to(cpu_device)
+        outputs = rgb_model(images.to(device=device, non_blocking=True)).to(cpu_device)
         outputs_list.append(outputs)
 
         images, targets = next(rgbdiff_data_loader_iter)
-        outputs = rgbdiff_model(images.to(device)).to(cpu_device)
+        outputs = rgbdiff_model(images.to(device=device, non_blocking=True)).to(cpu_device)
         outputs_list.append(outputs)
         outputs = torch.mean(torch.stack(outputs_list), dim=0)
 
@@ -66,15 +66,14 @@ def compute_on_dataset(rgb_model, rgb_data_loader, rgbdiff_model, rgbdiff_data_l
 
 
 def inference(rgb_cfg, rgb_model, rgbdiff_cfg, rgbdiff_model, device):
-    logger_name = rgb_cfg.INFER.NAME
     dataset_name = rgb_cfg.DATASETS.TEST.NAME
     output_dir = rgb_cfg.OUTPUT.DIR
 
-    rgb_data_loader = build_dataloader(rgb_cfg, train=False)
-    rgbdiff_data_loader = build_dataloader(rgbdiff_cfg, train=False)
+    rgb_data_loader = build_dataloader(rgb_cfg, is_train=False)
+    rgbdiff_data_loader = build_dataloader(rgbdiff_cfg, is_train=False)
     dataset = rgb_data_loader.dataset
 
-    logger = setup_logger(logger_name)
+    logger = logging.setup_logging()
     logger.info("Evaluating {} dataset({} video clips):".format(dataset_name, len(dataset)))
 
     results_dict, cate_acc_dict, acc_top1, acc_top5 = \
@@ -109,7 +108,7 @@ def inference(rgb_cfg, rgb_model, rgbdiff_cfg, rgbdiff_model, device):
 
 def test(args):
     torch.backends.cudnn.benchmark = True
-    logger = setup_logger('TEST')
+    logger = logging.setup_logging()
     device = torch.device(f'cuda:0' if torch.cuda.is_available() else 'cpu')
     map_location = {'cuda:%d' % 0: 'cuda:%d' % 0}
 
@@ -120,7 +119,7 @@ def test(args):
     rgb_cfg.OUTPUT.DIR = args.output
     rgb_cfg.freeze()
 
-    rgb_model = build_model(rgb_cfg, map_location=map_location).to(device)
+    rgb_model = build_model(rgb_cfg, 0)
     rgb_model.eval()
     checkpointer = CheckPointer(rgb_model, logger=logger)
     checkpointer.load(args.rgb_pretrained, map_location=map_location)
@@ -134,7 +133,7 @@ def test(args):
     rgbdiff_cfg.OUTPUT.DIR = args.output
     rgbdiff_cfg.freeze()
 
-    rgbdiff_model = build_model(rgbdiff_cfg, map_location=map_location).to(device)
+    rgbdiff_model = build_model(rgbdiff_cfg, 0)
     rgbdiff_model.eval()
     checkpointer = CheckPointer(rgbdiff_model, logger=logger)
     checkpointer.load(args.rgbdiff_pretrained, map_location=map_location)
@@ -162,7 +161,7 @@ def main():
 
     if not os.path.exists(args.output):
         os.makedirs(args.output)
-    logger = setup_logger("TSN", save_dir=args.output)
+    logger = logging.setup_logging(output_dir=args.output)
     logger.info(args)
     logger.info("Environment info:\n" + collect_env_info())
 

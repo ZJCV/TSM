@@ -7,15 +7,12 @@
 @description: 
 """
 
-import cv2
-from PIL import Image
-import random
-import os
-import numpy as np
-
-import torch
+from abc import ABCMeta, abstractmethod
 from torch.utils.data import Dataset
-from tsn.util.image import rgbdiff
+
+from .clipsample import SegmentedSample, DenseSample
+from .rawframe_dataset import RawFrameDataset
+from .video_dataset import VideoDataset
 
 
 class VideoRecord(object):
@@ -35,55 +32,118 @@ class VideoRecord(object):
         return int(self._data[2])
 
 
-class BaseDataset(Dataset):
+class BaseDataset(Dataset, metaclass=ABCMeta):
 
-    def __init__(self, data_dir, train=True, modality="RGB", num_segs=3, transform=None):
+    def __init__(self,
+                 data_dir,
+                 annotation_dir,
+                 modality="RGB",
+                 type='RawFrame',
+                 sample_strategy='SegSample',
+                 clip_len=1,
+                 frame_interval=1,
+                 num_clips=3,
+                 num_sample_positions=10,
+                 is_train=True,
+                 transform=None,
+                 **kwargs):
         assert isinstance(modality, str) and modality in ('RGB', 'RGBDiff')
+        assert isinstance(type, str) and type in ('RawFrame', 'Video')
+        assert isinstance(sample_strategy, str) and sample_strategy in ('SegSample', 'DenseSample')
+
+        if modality == 'RGB':
+            assert clip_len == 1
+        elif modality == 'RGBDiff':
+            assert clip_len == 5
+            # Diff needs one more image to calculate diff
+            clip_len += 1
+        else:
+            raise ValueError(f'{self.modality} does not exist')
 
         self.data_dir = data_dir
-        self.transform = transform
-        self.num_segs = num_segs
+        self.annotation_dir = annotation_dir
         self.modality = modality
-        self.train = train
+        self.type = type
+        self.sample_strategy = sample_strategy
+        self.clip_len = clip_len
+        self.frame_interval = frame_interval
+        self.num_clips = num_clips
+        self.num_sample_positions = num_sample_positions
+        self.is_train = is_train
+        self.transform = transform
+        self.kwargs = kwargs
+
+        if type == 'Video':
+            self.enable_multithread_decode = self.kwargs['enable_multithread_decode']
+            self.decoding_backend = self.kwargs['decoding_backend']
 
         self.video_list = None
         self.cate_list = None
         self.img_num_list = None
+        self.sampler = None
+        # RawFrames下标从0开始，比如UCF101/HMDB51，也有用1开始，比如JESTER
+        self.start_index = 0
+        # RawFrames图像命令前缀，比如UCF101/HMDB51使用img_，JESTER没有
+        self.img_prefix = 'img_'
+        self.evaluator = None
 
-        # 每个片段采集的帧数
-        if self.modality == 'RGB':
-            self.clip_length = 1
-        if self.modality == 'RGBDiff':
-            self.clip_length = 5 + 1  # Diff needs one more image to calculate diff
+    @abstractmethod
+    def _update_video(self, annotation_dir, is_train=True):
+        pass
 
-    def _update(self, annotation_path):
-        self.video_list = [VideoRecord(x.strip().split(' ')) for x in open(annotation_path)]
+    @abstractmethod
+    def _update_class(self):
+        pass
 
-    def _update_class(self, classes):
-        self.classes = classes
+    @abstractmethod
+    def _update_evaluator(self):
+        pass
 
-    def _sample_indices(self, record):
-        """
-        :param record: VideoRecord
-        :return: list
-        """
-        average_duration = (record.num_frames - self.clip_length + 1) // self.num_segs
-        if average_duration > 0:
-            offsets = np.multiply(list(range(self.num_segs)), average_duration) + \
-                      np.random.randint(average_duration, size=self.num_segs)
-        elif record.num_frames > self.num_segs:
-            offsets = np.sort(np.random.randint(record.num_frames - self.clip_length + 1, size=self.num_segs))
+    def _sample_frames(self):
+        if self.sample_strategy == 'SegSample':
+            self.clip_sample = SegmentedSample(self.clip_len,
+                                               self.frame_interval,
+                                               self.num_clips,
+                                               is_train=self.is_train,
+                                               start_index=self.start_index)
+        elif self.sample_strategy == 'DenseSample':
+            self.clip_sample = DenseSample(self.clip_len,
+                                           self.frame_interval,
+                                           self.num_clips,
+                                           is_train=self.is_train,
+                                           start_index=self.start_index,
+                                           num_sample_positions=self.num_sample_positions)
         else:
-            offsets = np.zeros((self.num_segs,))
-        return offsets
+            raise ValueError(f'{self.sample_strategy} does not exist')
 
-    def _get_test_indices(self, record):
+    def _update_dataset(self):
+        if self.type == 'RawFrame':
+            self.data_set = RawFrameDataset(self.clip_len,
+                                            self.frame_interval,
+                                            self.data_dir,
+                                            self.video_list,
+                                            self.clip_sample,
+                                            self.modality,
+                                            self.img_prefix,
+                                            self.transform)
+        elif self.type == 'Video':
+            self.data_set = VideoDataset(self.clip_len,
+                                         self.data_dir,
+                                         self.video_list,
+                                         self.clip_sample,
+                                         self.modality,
+                                         self.img_prefix,
+                                         self.transform,
+                                         self.enable_multithread_decode,
+                                         self.decoding_backend)
+        else:
+            raise ValueError(f'{self.type} does not exist')
 
-        tick = (record.num_frames - self.clip_length + 1) / float(self.num_segs)
-
-        offsets = np.array([int(tick / 2.0 + tick * x) for x in range(self.num_segs)])
-
-        return offsets
+    def __getitem__(self, index: int):
+        """
+        从选定的视频文件夹中随机选取T帧，则返回(T, C, H, W)，其中T表示num_segs
+        """
+        return self.data_set.__getitem__(index)
 
     def __len__(self) -> int:
-        return len(self.video_list)
+        return self.data_set.__len__()

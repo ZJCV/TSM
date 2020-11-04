@@ -2,6 +2,8 @@ from collections import deque, defaultdict
 import numpy as np
 import torch
 
+from .distributed import all_reduce
+
 
 class SmoothedValue:
     """Track a series of values and provide access to smoothed values over a
@@ -60,7 +62,7 @@ class MetricLogger:
     def __str__(self):
         loss_str = []
         for name, meter in self.meters.items():
-            if 'loss'.__eq__(name):
+            if 'loss' in name:
                 loss_str.append(
                     "{}: {:.6f} ({:.6f})".format(name, meter.avg, meter.global_avg)
                 )
@@ -69,3 +71,25 @@ class MetricLogger:
                     "{}: {:.3f} ({:.3f})".format(name, meter.avg, meter.global_avg)
                 )
         return self.delimiter.join(loss_str)
+
+
+def update_meters(num_gpus, meters, loss_dict, acc_dict):
+    assert isinstance(loss_dict, dict) and isinstance(acc_dict, dict)
+
+    # Gather all the predictions across all the devices.
+    keys = list()
+    values = list()
+    for key in sorted(loss_dict.keys()):
+        keys.append(key)
+        values.append(loss_dict[key])
+    for key in sorted(acc_dict.keys()):
+        keys.append(key)
+        values.append(acc_dict[key])
+    if num_gpus > 1:
+        reduced_values = all_reduce(values)
+        meter_dict = {k: v for k, v in zip(keys, reduced_values)}
+
+        meters.update(**meter_dict)
+    else:
+        meter_dict = {k: v for k, v in zip(keys, values)}
+        meters.update(**meter_dict)

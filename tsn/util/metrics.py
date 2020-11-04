@@ -7,15 +7,11 @@
 @description: 
 """
 
-import torch
 from thop import profile
 
-from torchvision.models import AlexNet
 
-
-def compute_num_flops(model):
-    input = torch.randn(1, 3, 224, 224)
-    macs, params = profile(model, inputs=(input,), verbose=False)
+def compute_num_flops(model, data):
+    macs, params = profile(model, inputs=(data,), verbose=False)
     # print(macs, params)
 
     GFlops = macs * 2.0 / pow(10, 9)

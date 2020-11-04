@@ -10,16 +10,16 @@
 import torch.optim as optim
 from torch.optim.optimizer import Optimizer
 
-from tsn.optim import registry
+from .. import registry
 
 
-@registry.LR_SCHEDULERS.register('cosine_annearling_lr')
+@registry.LR_SCHEDULERS.register('CosineAnnearlingLR')
 def build_cosine_annearling_lr(cfg, optimizer):
     assert isinstance(optimizer, Optimizer)
 
     max_iteration = cfg.TRAIN.MAX_ITER
-    if cfg.LR_SCHEDULER.WARMUP:
-        max_iteration -= cfg.LR_SCHEDULER.ITERATION
-    minimal_lr = cfg.LR_SCHEDULER.MINIMAL_LR
+    if cfg.LR_SCHEDULER.IS_WARMUP:
+        max_iteration -= cfg.LR_SCHEDULER.WARMUP.ITERATION
+    minimal_lr = cfg.LR_SCHEDULER.COSINE_ANNEALING_LR.MINIMAL_LR
 
     return optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_iteration, eta_min=minimal_lr)

@@ -8,11 +8,12 @@
 """
 
 import os
-import cv2
-import torch
-from PIL import Image
-import numpy as np
-from .base_dataset import BaseDataset
+
+from .evaluator.hmdb51 import HMDB51Evaluator
+from .base_dataset import VideoRecord, BaseDataset
+from .video import video_container as container
+from .video import decoder
+from tsn.util import logging
 
 classes = ['brush_hair', 'cartwheel', 'catch', 'chew', 'clap', 'climb',
            'climb_stairs', 'dive', 'draw_sword', 'dribble', 'drink', 'eat',
@@ -27,56 +28,65 @@ classes = ['brush_hair', 'cartwheel', 'catch', 'chew', 'clap', 'climb',
 
 class HMDB51(BaseDataset):
 
-    def __init__(self, data_dir, annotation_dir, modality="RGB", num_segs=3, split=1, train=True, transform=None):
+    def __init__(self,
+                 *args,
+                 split=1,
+                 **kwargs):
         assert isinstance(split, int) and split in (1, 2, 3)
-        super(HMDB51, self).__init__(data_dir, train=train, modality=modality, num_segs=num_segs, transform=transform)
+        super(HMDB51, self).__init__(*args, **kwargs)
 
-        if train:
-            annotation_path = os.path.join(annotation_dir, f'hmdb51_train_split_{split}_rawframes.txt')
-            if not os.path.isfile(annotation_path):
-                raise ValueError(f'{annotation_path}不是文件路径')
+        self.split = split
+        self.start_index = 0
+        self.img_prefix = 'img_'
+
+        self._update_video(self.annotation_dir, is_train=self.is_train)
+        self._update_class()
+        self._sample_frames()
+        self._update_dataset()
+        self._update_evaluator()
+
+    def _update_video(self, annotation_dir, is_train=True):
+        dataset_type = 'rawframes' if self.type == 'RawFrame' else 'videos'
+        if is_train:
+            annotation_path = os.path.join(annotation_dir, f'hmdb51_train_split_{self.split}_{dataset_type}.txt')
         else:
-            annotation_path = os.path.join(annotation_dir, f'hmdb51_val_split_{split}_rawframes.txt')
-            if not os.path.isfile(annotation_path):
-                raise ValueError(f'{annotation_path}不是文件路径')
-        self._update(annotation_path)
-        self._update_class(classes)
+            annotation_path = os.path.join(annotation_dir, f'hmdb51_val_split_{self.split}_{dataset_type}.txt')
 
-    def __getitem__(self, index: int):
-        """
-        从选定的视频文件夹中随机选取T帧，则返回(T, C, H, W)，其中T表示num_segs
-        """
-        assert index < len(self.video_list)
-        record = self.video_list[index]
-        target = record.label
+        if not os.path.isfile(annotation_path):
+            raise ValueError(f'{annotation_path}不是文件路径')
 
-        if self.train:
-            segment_indices = self._sample_indices(record)
+        if self.type == 'RawFrame':
+            self.video_list = [VideoRecord(x.strip().split(' ')) for x in open(annotation_path)]
+        elif self.type == 'Video':
+            video_list = list()
+            for x in open(annotation_path):
+                video_path, cate = x.strip().split(' ')
+                video_path = os.path.join(self.data_dir, video_path)
+
+                # Try to decode and sample a clip from a video.
+                video_container = None
+                try:
+                    video_container = container.get_video_container(
+                        video_path,
+                        self.enable_multithread_decode,
+                        self.decoding_backend,
+                    )
+                except Exception as e:
+                    logger = logging.setup_logging(__name__)
+                    logger.info(
+                        "Failed to load video from {} with error {}".format(
+                            video_path, e
+                        )
+                    )
+
+                frames_length = decoder.get_video_length(video_container)
+                video_list.append(VideoRecord([video_path, frames_length, cate]))
+            self.video_list = video_list
         else:
-            segment_indices = self._get_test_indices(record)
+            raise ValueError(f'{self.type} does not exist')
 
-        video_path = os.path.join(self.data_dir, record.path)
-        image_list = list()
-        for num in segment_indices:
-            if 'RGB' == self.modality:
-                image_path = os.path.join(video_path, 'img_{:0>5d}.jpg'.format(num))
-                img = cv2.imread(image_path)
+    def _update_class(self):
+        self.classes = classes
 
-                if self.transform:
-                    img = self.transform(img)
-                image_list.append(img)
-            if 'RGBDiff' == self.modality:
-                tmp_list = list()
-                for clip in range(self.clip_length):
-                    img_path = os.path.join(video_path, 'img_{:0>5d}.jpg'.format(num + clip))
-                    img = np.array(Image.open(img_path))
-
-                    tmp_list.append(img)
-                for clip in reversed(range(1, self.clip_length)):
-                    img = tmp_list[clip] - tmp_list[clip - 1]
-                    if self.transform:
-                        img = self.transform(img)
-                    image_list.append(img)
-        image = torch.stack(image_list)
-
-        return image, target
+    def _update_evaluator(self):
+        self.evaluator = HMDB51Evaluator(self.classes, topk=(1, 5))

@@ -1,8 +1,8 @@
-import logging
 import os
-
 import torch
 from torch.nn.parallel import DistributedDataParallel
+
+from . import logging
 
 
 class CheckPointer:
@@ -21,7 +21,7 @@ class CheckPointer:
         self.save_dir = save_dir
         self.save_to_disk = save_to_disk
         if logger is None:
-            logger = logging.getLogger(__name__)
+            logger = logging.setup_logging(__name__)
         self.logger = logger
 
     def save(self, name, **kwargs):
@@ -48,18 +48,16 @@ class CheckPointer:
 
         self.tag_last_checkpoint(save_file)
 
-    def load(self, f=None, use_latest=True, map_location=None, rank=0):
+    def load(self, f=None, use_latest=True, map_location=None):
         if not f and self.has_checkpoint() and use_latest:
             # override argument with existing checkpoint
             f = self.get_checkpoint_file()
         if not f:
             # no checkpoint could be found
-            if rank == 0:
-                self.logger.info("No checkpoint found.")
+            self.logger.info("No checkpoint found.")
             return {}
 
-        if rank == 0:
-            self.logger.info("Loading checkpoint from {}".format(f))
+        self.logger.info("Loading checkpoint from {}".format(f))
         checkpoint = self._load_file(f, map_location=map_location)
         model = self.model
         if isinstance(model, DistributedDataParallel):
@@ -67,12 +65,10 @@ class CheckPointer:
 
         model.load_state_dict(checkpoint.pop("model"))
         if "optimizer" in checkpoint and self.optimizer:
-            if rank == 0:
-                self.logger.info("Loading optimizer from {}".format(f))
+            self.logger.info("Loading optimizer from {}".format(f))
             self.optimizer.load_state_dict(checkpoint.pop("optimizer"))
         if "scheduler" in checkpoint and self.scheduler:
-            if rank == 0:
-                self.logger.info("Loading scheduler from {}".format(f))
+            self.logger.info("Loading scheduler from {}".format(f))
             self.scheduler.load_state_dict(checkpoint.pop("scheduler"))
 
         # return any further checkpoint data

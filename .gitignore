@@ -1,3 +1,4 @@
 .idea/
-./outputs/
+outputs/
+data/
 *.pyc

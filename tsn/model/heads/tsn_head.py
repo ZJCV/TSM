@@ -10,7 +10,7 @@
 import torch
 import torch.nn as nn
 
-from tsn.model import registry
+from .. import registry
 
 
 @registry.HEAD.register('TSNHead')

@@ -28,3 +28,7 @@ class IterationBasedBatchSampler(BatchSampler):
 
     def __len__(self):
         return self.num_iterations
+
+    def set_epoch(self, iteration):
+        if hasattr(self.batch_sampler.sampler, "set_epoch"):
+            self.batch_sampler.sampler.set_epoch(iteration)

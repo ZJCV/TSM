@@ -7,9 +7,7 @@
 @description: 
 """
 
-import torch.nn as nn
-
-from tsn.model import registry
+from .. import registry
 
 from .avg_consensus import AvgConsensus
 
